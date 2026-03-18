@@ -690,10 +690,25 @@ window.toggleStacking = toggleStacking;
 window.openDailyDrop = function() { document.getElementById('daily-drop-modal').style.display = 'flex'; };
 window.openWhatsAppModal = openWhatsAppModal;
 window.confirmWhatsAppDownload = confirmWhatsAppDownload;
-window.downloadSingleSnapshot = () => { if(currentPreviewData.url) saveAs(currentPreviewData.url, currentPreviewData.name); };
-window.shareSingleSnapshot = () => { if(currentPreviewData.url) fetch(currentPreviewData.url).then(r => r.blob()).then(b => navigator.share({files:[new File([b],"look.png",{type:"image/png"})]})); };
-window.downloadAllAsZip = () => { if(autoSnapshots.length>0) { const z=new JSZip(); const f=z.folder("Jewels_Collection"); autoSnapshots.forEach(i=>f.file(i.name,i.url.split(',')[1],{base64:true})); z.generateAsync({type:"blob"}).then(c=>saveAs(c,"Jewels.zip")); }};
-window.changeProduct = changeProduct; 
+window.downloadSingleSnapshot = () => {
+    if (currentPreviewData.url) {
+        const btn = event.target; // Gets the button that was clicked
+        const originalText = btn.innerText;
+        
+        btn.innerText = "Downloading...";
+        btn.disabled = true;
+
+        try {
+            saveAs(currentPreviewData.url, currentPreviewData.name);
+        } finally {
+            // Revert text after a short delay so the user sees the change
+            setTimeout(() => {
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }, 1500);
+        }
+    }
+};window.changeProduct = changeProduct; 
 window.showToast = (msg) => { var x=document.getElementById("toast-notification"); x.innerText=msg; x.className="show"; setTimeout(()=>x.className=x.className.replace("show",""),3000); };
 function prepareDailyDrop() { if(JEWELRY_ASSETS['earrings'] && JEWELRY_ASSETS['earrings'].length > 0) { const l=JEWELRY_ASSETS['earrings']; const i=Math.floor(Math.random()*l.length); dailyItem={item:l[i],index:i,type:'earrings'}; document.getElementById('daily-img').src=dailyItem.item.thumbSrc; document.getElementById('daily-name').innerText=dailyItem.item.name; } }
 function closeDailyDrop() { document.getElementById('daily-drop-modal').style.display='none'; }
