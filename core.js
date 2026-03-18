@@ -501,59 +501,91 @@ hands.onResults((results) => {
   canvasCtx.restore();
 });
 
-/* --- 10. CAPTURE LOGIC (Secure Screenshot) --- */
 function captureToGallery() {
     const tempCanvas = document.createElement('canvas'); 
     tempCanvas.width = videoElement.videoWidth; 
     tempCanvas.height = videoElement.videoHeight; 
     const tempCtx = tempCanvas.getContext('2d');
     
-    if (currentCameraMode === 'environment') { tempCtx.translate(0, 0); tempCtx.scale(1, 1); } 
-    else { tempCtx.translate(tempCanvas.width, 0); tempCtx.scale(-1, 1); }
-    
+    // 1. Mirroring Correction
+    if (currentCameraMode === 'user') {
+        tempCtx.translate(tempCanvas.width, 0);
+        tempCtx.scale(-1, 1);
+    }
     tempCtx.drawImage(videoElement, 0, 0); 
-    tempCtx.setTransform(1, 0, 0, 1, 0, 0);
+    tempCtx.setTransform(1, 0, 0, 1, 0, 0); // Reset for overlays
+    tempCtx.drawImage(canvasElement, 0, 0);
     
-    try { tempCtx.drawImage(canvasElement, 0, 0); } 
-    catch(e) { console.error("Snapshot Warning: AR Canvas tainted/missing.", e); }
+    // 2. Text Content Setup
+    // Ensure we handle both the Name and the Product Code/Description string
+    let fullText = currentAssetName.replace(/\.(png|jpg|jpeg|webp)$/i, "").replace(/_/g, " ");
     
-    let cleanName = currentAssetName.replace(/\.(png|jpg|jpeg|webp)$/i, "").replace(/_/g, " "); 
-    cleanName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
+    const boxWidth = tempCanvas.width * 0.8;
+    const padding = 30;
+    const titleSize = Math.max(24, tempCanvas.width * 0.05);
+    const descSize = Math.max(16, tempCanvas.width * 0.035);
+    const lineHeight = descSize + 10;
     
-    const padding = tempCanvas.width * 0.04; 
-    const titleSize = tempCanvas.width * 0.045; 
-    const descSize = tempCanvas.width * 0.035; 
-    const contentHeight = (titleSize * 2) + descSize + padding;
+    // 3. THE WORD WRAPPER ENGINE
+    tempCtx.font = `${descSize}px Montserrat`;
+    const maxTextWidth = boxWidth - (padding * 2);
+    const words = fullText.split(" ");
+    let lines = [];
+    let currentLine = "";
+
+    for (let n = 0; n < words.length; n++) {
+        let testLine = currentLine + words[n] + " ";
+        let metrics = tempCtx.measureText(testLine);
+        if (metrics.width > maxTextWidth && n > 0) {
+            lines.push(currentLine);
+            currentLine = words[n] + " ";
+        } else {
+            currentLine = testLine;
+        }
+    }
+    lines.push(currentLine); // Push the final line
+
+    // 4. Dynamic Box Height Calculation
+    const boxHeight = (lines.length * lineHeight) + titleSize + 80;
+    const boxX = (tempCanvas.width - boxWidth) / 2;
+    const boxY = tempCanvas.height - boxHeight - 40;
+
+    // 5. Draw 80% Black Opacity Box & Gold Border
+    tempCtx.fillStyle = "rgba(0, 0, 0, 0.85)";
+    tempCtx.fillRect(boxX, boxY, boxWidth, boxHeight);
     
-    const gradient = tempCtx.createLinearGradient(0, tempCanvas.height - contentHeight - padding, 0, tempCanvas.height);
-    gradient.addColorStop(0, "rgba(0,0,0,0)"); 
-    gradient.addColorStop(0.2, "rgba(0,0,0,0.8)"); 
-    gradient.addColorStop(1, "rgba(0,0,0,0.95)");
+    tempCtx.strokeStyle = "#d4af37";
+    tempCtx.lineWidth = 3;
+    tempCtx.strokeRect(boxX, boxY, boxWidth, boxHeight);
+
+    // 6. Render Text Line-by-Line
+    tempCtx.textAlign = "center";
     
-    tempCtx.fillStyle = gradient; 
-    tempCtx.fillRect(0, tempCanvas.height - contentHeight - padding, tempCanvas.width, contentHeight + padding);
-    
-    tempCtx.font = `bold ${titleSize}px Playfair Display, serif`; 
-    tempCtx.fillStyle = "#d4af37"; tempCtx.textAlign = "left"; tempCtx.textBaseline = "top"; 
-    tempCtx.fillText("Product Description", padding, tempCanvas.height - contentHeight);
-    
-    tempCtx.font = `${descSize}px Montserrat, sans-serif`; 
-    tempCtx.fillStyle = "#ffffff"; tempCtx.fillText(cleanName, padding, tempCanvas.height - contentHeight + (titleSize * 1.5));
-    
-    if (watermarkImg.complete) { 
-        const wWidth = tempCanvas.width * 0.25; 
-        const wHeight = (watermarkImg.height / watermarkImg.width) * wWidth; 
-        try { tempCtx.drawImage(watermarkImg, tempCanvas.width - wWidth - padding, padding, wWidth, wHeight); } 
-        catch(e) { console.log("Watermark draw skipped"); }
+    // Header
+    tempCtx.font = `bold ${titleSize}px Playfair Display`;
+    tempCtx.fillStyle = "#d4af37";
+    tempCtx.fillText("Product Description", tempCanvas.width / 2, boxY + titleSize + 20);
+
+    // Dynamic Description Lines
+    tempCtx.font = `${descSize}px Montserrat`;
+    tempCtx.fillStyle = "#ffffff";
+    lines.forEach((line, i) => {
+        tempCtx.fillText(
+            line.trim(), 
+            tempCanvas.width / 2, 
+            boxY + titleSize + 65 + (i * lineHeight)
+        );
+    });
+
+    // 7. Watermark
+    if (watermarkImg.complete) {
+        const wWidth = tempCanvas.width * 0.2;
+        const wHeight = (watermarkImg.height / watermarkImg.width) * wWidth;
+        tempCtx.globalAlpha = 0.7;
+        tempCtx.drawImage(watermarkImg, tempCanvas.width - wWidth - 20, 20, wWidth, wHeight);
     }
     
-    try {
-        const dataUrl = tempCanvas.toDataURL('image/png'); 
-        return { url: dataUrl, name: `Jewels-Ai_${Date.now()}.png` }; 
-    } catch(e) {
-        console.error("CRITICAL: Canvas Tainted.", e);
-        return null;
-    }
+    return { url: tempCanvas.toDataURL('image/png'), name: `Jewels-Ai_${Date.now()}.png` };
 }
 
 /* --- 11. TRY ALL & GALLERY LOGIC --- */
